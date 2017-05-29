@@ -14,8 +14,8 @@ NSGW = 3;
 NSGH = 3;
 
 # define system paths
-QGIS_PATH = "/usr/share/qgis"
-GMAP_API_KEY = "AIzaSyB-WQIcBO85Yzd5FR7jFT_f4TNJKenRT5o"
+QGIS_PATH = "Your QGIS install dir"
+GMAP_API_KEY = "Your Google Map API Key"
 GMAP_API_URL = "https://maps.googleapis.com/maps/api/elevation/json?locations="
 
 def getBuildingHeight( _layer, _lat, _lng ):
