@@ -55,12 +55,14 @@ def getBuildingHeight( _layer, _lat, _lng ):
 			height = feat[0]['A16'];
 		elif feat[0]['A12'] != 0.0:
 			height = 3.0 * ( feat[0]['A14'] / feat[0]['A12'] )
+		elif feat[0]['A17'] != 0.0:
+			height = 3.0 * ( feat[0]['A18'] / feat[0]['A17'] )
 
 	_layer.setSelectedFeatures( [] )
 
 	return height
 ```
-위의 코드는 QGIS 레이어와 위경도를 입력으로 받아 해당 지점에 위치한 건물의 높이를 가져오는 코드입니다(레이어 및 QGIS 초기화에 관련한 코드는 QuantizeCity.py의 main scope에서 확인할 수 있습니다). 한편, **getBuildingHeight 함수는 입력받은 지점을 기준으로 0.000001만큼 padding을 넣은 정사각형 영역**을 선택하도록 합니다. 이러한 padding은 추후 GridMap의 resolution을 결정할 수 있는 중요한 인자이므로 상수 **SAMPLING_RESOLUTION**으로 따로 정의하도록 했습니다. 행정자치부의 데이터는 컬럼 A16에 건물의 높이 정보를 저장하고 있는데, 데이터를 확인해보니 종종 높이 값이 0.0으로 조사되지 않은 건물들이 있습니다. 이런 경우, 최대한 높이 정보를 얻어내기 위해 대략적인 근사를 사용합니다. 컬럼 A14에는 연면적이, 컬럼 A12에는 건축물면적이 저장되어 있으므로 두 값을 나누면 대략적인 건물의 층 수를 알 수 있습니다. 이 후 한 층의 높이를 대략 3.0m로 근사하여 건물의 높이를 구하는 것을 위 코드가 나타냅니다.  
+위의 코드는 QGIS 레이어와 위경도를 입력으로 받아 해당 지점에 위치한 건물의 높이를 가져오는 코드입니다(레이어 및 QGIS 초기화에 관련한 코드는 QuantizeCity.py의 main scope에서 확인할 수 있습니다). 한편, **getBuildingHeight 함수는 입력받은 지점을 기준으로 0.000001만큼 padding을 넣은 정사각형 영역**을 선택하도록 합니다. 이러한 padding은 추후 GridMap의 resolution을 결정할 수 있는 중요한 인자이므로 상수 **SAMPLING_RESOLUTION**으로 따로 정의하도록 했습니다. 행정자치부의 데이터는 컬럼 A16에 건물의 높이 정보를 저장하고 있는데, 데이터를 확인해보니 종종 높이 값이 0.0으로 조사되지 않은 건물들이 있습니다. 이런 경우, 두 가지의 꼼수를 사용해 봅니다. 첫 번째로, 컬럼 A14에는 연면적이, 컬럼 A12에는 건축물면적이 저장되어 있으므로 두 값을 나누면 대략적인 건물의 층 수를 알 수 있습니다. 이 후 한 층의 높이를 대략 3.0m로 근사하여 건물의 높이를 구할 수 있습니다. 이 방법 역시 실패할 경우, 둘째로 용적률을 건폐율로 나눈 값을 층 수로 근사하는 꼼수를 사용해 볼 수 있습니다. 위의 코드가 이러한 꼼수를 보여줍니다.  
 
 ## IV. 함수 G : (위도, 경도) -> (지형 고도) 개발
 ### IV.1. Google Map API key 받기
@@ -197,7 +199,7 @@ def generateGrid( _UL, _LR, _shpPath, _gridPath ):
 			x = _UL[1] + ( sgCol + 0.5 ) * sg_d_x
 			y = _UL[0] - ( sgRow + 0.5 ) * sg_d_y
 			bh = getBuildingHeight( layer, y, x )
-			lh = bigGrid[sgRow % NBGH][sgCol % NBGW]
+			lh = bigGrid[sgRow / NBGH][sgCol / NBGW]
 			line = "%d %d %.15f %.15f %.15f %.15f\n" % (sgRow, sgCol, y, x, bh, lh)
 			grid.write(line)
 	grid.close()

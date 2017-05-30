@@ -10,12 +10,12 @@ from urllib2 import urlopen
 SAMPLING_RESOLUTION = 0.000001
 NBGW = 5;
 NBGH = 5;
-NSGW = 10;
-NSGH = 10;
+NSGW = 5;
+NSGH = 5;
 
 # define system paths
-QGIS_PATH = "Your QGIS Installation Path"
-GMAP_API_KEY = "Your API Key from Google Map Elevation Service"
+QGIS_PATH = "/usr/share/qgis"
+GMAP_API_KEY = "AIzaSyB-WQIcBO85Yzd5FR7jFT_f4TNJKenRT5o"
 GMAP_API_URL = "https://maps.googleapis.com/maps/api/elevation/json?locations="
 
 def getBuildingHeight( _layer, _lat, _lng ):
@@ -41,6 +41,8 @@ def getBuildingHeight( _layer, _lat, _lng ):
 			height = feat[0]['A16'];
 		elif feat[0]['A12'] != 0.0:
 			height = 3.0 * ( feat[0]['A14'] / feat[0]['A12'] )
+		elif feat[0]['A17'] != 0.0:
+			height = 3.0 * ( feat[0]['A18'] / feat[0]['A17'] )
 
 	_layer.setSelectedFeatures( [] )
 
@@ -138,7 +140,7 @@ def generateGrid( _UL, _LR, _shpPath, _gridPath ):
 			x = _UL[1] + ( sgCol + 0.5 ) * sg_d_x
 			y = _UL[0] - ( sgRow + 0.5 ) * sg_d_y
 			bh = getBuildingHeight( layer, y, x )
-			lh = bigGrid[sgRow % NBGH][sgCol % NBGW]
+			lh = bigGrid[sgRow / NBGH][sgCol / NBGW]
 			line = "%d %d %.15f %.15f %.15f %.15f\n" % (sgRow, sgCol, y, x, bh, lh)
 			grid.write(line)
 	grid.close()
