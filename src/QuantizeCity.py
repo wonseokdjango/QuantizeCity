@@ -6,16 +6,16 @@ from qgis.core import *
 import json
 from urllib2 import urlopen
 
-# define constants
+# define tunning constants
 SAMPLING_RESOLUTION = 0.000001
-NBGW = 2;
-NBGH = 2;
-NSGW = 3;
-NSGH = 3;
+NBGW = 5;
+NBGH = 5;
+NSGW = 10;
+NSGH = 10;
 
 # define system paths
-QGIS_PATH = "Your QGIS install dir"
-GMAP_API_KEY = "Your Google Map API Key"
+QGIS_PATH = "Your QGIS Installation Path"
+GMAP_API_KEY = "Your API Key from Google Map Elevation Service"
 GMAP_API_URL = "https://maps.googleapis.com/maps/api/elevation/json?locations="
 
 def getBuildingHeight( _layer, _lat, _lng ):
@@ -37,7 +37,10 @@ def getBuildingHeight( _layer, _lat, _lng ):
 
 	height = 0.0
 	if len(feat) == 1:
-		height = feat[0]['A16'];
+		if feat[0]['A16'] != 0:
+			height = feat[0]['A16'];
+		elif feat[0]['A12'] != 0.0:
+			height = 3.0 * ( feat[0]['A14'] / feat[0]['A12'] )
 
 	_layer.setSelectedFeatures( [] )
 
@@ -66,6 +69,10 @@ def getLandElevation( _locs ):
 	
 		fp = urlopen( GMAP_API_URL + PARAMS )
 		response = json.loads( fp.read().decode() )
+		if response["status"] != "OK":
+			keyPress = input( "url open error. continue? [y/n] : " )
+			if keyPress == "n":
+				exit()
 
 		for result in response["results"]:
 			ret.append( float( result["elevation"] ) )
@@ -85,6 +92,10 @@ def generateGrid( _UL, _LR, _shpPath, _gridPath ):
 	
 	_UL = [ float( i ) for i in _UL ]
 	_LR = [ float( i ) for i in _LR ]
+	if ( _LR[1] - _UL[1] ) <= 0.0 or ( _UL[0] - _LR[0] ) <= 0.0:
+		keyPress = input( "invalid upper left, lower right. continue? [y/n] : " )
+		if keyPress == "n":
+			exit()
 	
 	bigGrid = [ [ 0.0 ] * NBGW for row in range( NBGH ) ]
 	bg_d_x = ( _LR[1] - _UL[1] ) / float( NBGW );
@@ -106,8 +117,17 @@ def generateGrid( _UL, _LR, _shpPath, _gridPath ):
 	sg_d_y = ( _UL[0] - _LR[0] ) / float( NSGH * NBGH );
 
 	layer = QgsVectorLayer( _shpPath, "Buildings", "ogr" )
+	if not layer.isValid():
+		keyPress = input( "QGIS layer loading is failed. continue? [y/n] : " )
+		if keyPress == "n":
+			exit()
+	try:
+		grid = open(_gridPath, "w")
+	except IOError, e:
+	 	keyPress = input( "file open error. continue? [y/n] : " )
+	 	if keyPress == "n":
+	 		exit()
 
-	grid = open(_gridPath, "w");
 	line = "%.15lf %.15lf %.15lf %.15lf\n" % (_UL[0], _UL[1], _LR[0], _LR[1])
 	grid.write(line)
 	line = "%d %d %d %d\n" % (NBGH, NBGW, NSGH, NSGW)

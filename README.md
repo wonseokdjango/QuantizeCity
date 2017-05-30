@@ -51,13 +51,16 @@ def getBuildingHeight( _layer, _lat, _lng ):
 
 	height = 0.0
 	if len(feat) == 1:
-		height = feat[0]['A16'];
+		if feat[0]['A16'] != 0:
+			height = feat[0]['A16'];
+		elif feat[0]['A12'] != 0.0:
+			height = 3.0 * ( feat[0]['A14'] / feat[0]['A12'] )
 
 	_layer.setSelectedFeatures( [] )
 
 	return height
 ```
-위의 코드는 QGIS 레이어와 위경도를 입력으로 받아 해당 지점에 위치한 건물의 높이를 가져오는 코드입니다(레이어 및 QGIS 초기화에 관련한 코드는 QuantizeCity.py의 main scope에서 확인할 수 있습니다). 한편, **getBuildingHeight 함수는 입력받은 지점을 기준으로 0.000001만큼 padding을 넣은 정사각형 영역**을 선택하도록 합니다. 이러한 padding은 추후 GridMap의 resolution을 결정할 수 있는 중요한 인자이므로 상수 **SAMPLING_RESOLUTION**으로 따로 정의하도록 했습니다.
+위의 코드는 QGIS 레이어와 위경도를 입력으로 받아 해당 지점에 위치한 건물의 높이를 가져오는 코드입니다(레이어 및 QGIS 초기화에 관련한 코드는 QuantizeCity.py의 main scope에서 확인할 수 있습니다). 한편, **getBuildingHeight 함수는 입력받은 지점을 기준으로 0.000001만큼 padding을 넣은 정사각형 영역**을 선택하도록 합니다. 이러한 padding은 추후 GridMap의 resolution을 결정할 수 있는 중요한 인자이므로 상수 **SAMPLING_RESOLUTION**으로 따로 정의하도록 했습니다. 행정자치부의 데이터는 컬럼 A16에 건물의 높이 정보를 저장하고 있는데, 데이터를 확인해보니 종종 높이 값이 0.0으로 조사되지 않은 건물들이 있습니다. 이런 경우, 최대한 높이 정보를 얻어내기 위해 대략적인 근사를 사용합니다. 컬럼 A14에는 연면적이, 컬럼 A12에는 건축물면적이 저장되어 있으므로 두 값을 나누면 대략적인 건물의 층 수를 알 수 있습니다. 이 후 한 층의 높이를 대략 3.0m로 근사하여 건물의 높이를 구하는 것을 위 코드가 나타냅니다.  
 
 ## IV. 함수 G : (위도, 경도) -> (지형 고도) 개발
 ### IV.1. Google Map API key 받기
@@ -93,13 +96,17 @@ def getLandElevation( _locs ):
 
 		fp = urlopen( GMAP_API_URL + PARAMS )
 		response = json.loads( fp.read().decode() )
+		if response["status"] != "OK":
+			keyPress = input( "url open error. continue? [y/n] : " )
+			if keyPress == "n":
+				exit()
 
 		for result in response["results"]:
 			ret.append( float( result["elevation"] ) )
 
 	return ret
 ```
-위의 코드는 경위도 리스트를 입력으로 받아 단순히 해당 지점의 지형고도를 리스트로 반환하는 예제 입니다. III.의 함수 F와 다르게 getLandElevation 함수가 리스트를 입력으로 받는 이유는 Google Map API는 하루에 한번에 최대 512개 지점을 쿼리할 수 있는 요청을 2500개만 허용하기 때문입니다. 따라서, 위의 코드와 같이 최대한 한 번에 많은 쿼리를 날리는 것이 경제적입니다.
+위의 코드는 경위도 리스트를 입력으로 받아 단순히 해당 지점의 지형고도를 리스트로 반환하는 예제 입니다. III.의 함수 F와 다르게 getLandElevation 함수가 리스트를 입력으로 받는 이유는 Google Map API는 하루에 한번에 최대 512개 지점을 쿼리할 수 있는 요청을 2500개만 허용하기 때문입니다. 따라서, 위의 코드와 같이 최대한 한 번에 많은(512개 씩 묶어서) 쿼리를 날리는 것이 경제적입니다.
 
 ## V. Grid 생성
 ### V.1. 기본 아이디어
@@ -116,7 +123,7 @@ def getLandElevation( _locs ):
 위의 정의로부터 위의 그림은 (NBGH, NBGW, NSGH, NSGW) = (5, 6, 2, 2)임을 쉽게 알 수 있습니다. 특정 좌표 (lat, lng)가 주어질 때 해당지점의 높이 정보 H는 아래와 같이 정의할 수 있습니다.  
 > ***H(lat, lng) = (lat, lng)이 속하는 붉은 Grid의 지형고도 + (lat, lng)이 속하는 푸른 Grid의 시설물 고도***
 
-이는 전체 Grid가 NBGH * NBGW개의 지형고도 정보만을 사용하며, 하나의 붉은 Grid 안에 위치하는 NSGH * NSGW개의 푸른 Grid가 자신이 속하는 붉은 Grid의 지형고도 정보를 공유하는 것을 의미합니다. 추후 정밀도를 높이기 위에 위에서 밝힌 4개 상수를 tunning하거나 interpolation을 사용하는 방법을 고려해볼만 합니다.
+이는 전체 Grid가 NBGH * NBGW개의 지형고도 정보만을 사용하며, 하나의 붉은 Grid 안에 위치하는 NSGH * NSGW개의 푸른 Grid가 자신이 속하는 붉은 Grid의 지형고도 정보를 공유하는 것을 의미합니다. 추후 정밀도를 높이기 위에 위에서 밝힌 4개 상수를 tunning하거나 interpolation을 사용하는 방법을 고려해볼만 합니다. 이렇게 두 레벨의 Grid로 지도를 관리할 때는 크게 2가지의 이점이 있는데, 첫 째는 지형고도 API 일일 요청량의 균형을 조정할 수 있다는 점, 둘째, 하나의 레벨로 지도를 관리하는 경우의 superset이라는 점(NSGH, NSGW를 1로 설정하는 경우)이 있습니다.
 ### V.2. 출력파일 형식 정의
 ---
 파일로 Grid정보를 출력할 때 출력파일의 포맷은 다음과 같습니다. 아래에서 모든 부동소수점은 소수점 아래 15자리까지 표현됩니다.
@@ -144,6 +151,10 @@ def generateGrid( _UL, _LR, _shpPath, _gridPath ):
 
 	_UL = [ float( i ) for i in _UL ]
 	_LR = [ float( i ) for i in _LR ]
+	if ( _LR[1] - _UL[1] ) <= 0.0 or ( _UL[0] - _LR[0] ) <= 0.0:
+		keyPress = input( "invalid upper left, lower right. continue? [y/n] : " )
+		if keyPress == "n":
+			exit()
 
 	bigGrid = [ [ 0.0 ] * NBGW for row in range( NBGH ) ]
 	bg_d_x = ( _LR[1] - _UL[1] ) / float( NBGW );
@@ -165,8 +176,17 @@ def generateGrid( _UL, _LR, _shpPath, _gridPath ):
 	sg_d_y = ( _UL[0] - _LR[0] ) / float( NSGH * NBGH );
 
 	layer = QgsVectorLayer( _shpPath, "Buildings", "ogr" )
+	if not layer.isValid():
+		keyPress = input( "QGIS layer loading is failed. continue? [y/n] : " )
+		if keyPress == "n":
+			exit()
+	try:
+		grid = open(_gridPath, "w")
+	except IOError, e:
+	 	keyPress = input( "file open error. continue? [y/n] : " )
+	 	if keyPress == "n":
+	 		exit()
 
-	grid = open(_gridPath, "w");
 	line = "%.15lf %.15lf %.15lf %.15lf\n" % (_UL[0], _UL[1], _LR[0], _LR[1])
 	grid.write(line)
 	line = "%d %d %d %d\n" % (NBGH, NBGW, NSGH, NSGW)
