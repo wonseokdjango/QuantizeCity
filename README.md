@@ -132,8 +132,9 @@ def getBuildingHeight( _layer, _index, _lat, _lng ):
 붉은 Grid를 듬성듬성 구성함으로써 Google Map API의 일일 요청량 제한을 맞출 수는 있게 되었지만, 하나의 붉은 Grid에 존재하는 모든 푸른 Grid가 하나의 지형 고도 값(자신이 속하는 붉은 Grid)을 공유하는 건 비합리적입니다. 따라서, 하나의 붉은 Grid안에 존재하는 각각의 푸른 Grid들에 대해서는 bilnear interpolation을 수행해줍니다. bilinear interpolation을 위해 하나의 푸른 Grid는 4개의 점을 bilinear interploation을 위한 reference로 삼아야합니다. 4개의 referene의 선정기준은 다음과 같습니다.  
 > 자신이 속한 붉은 Grid의 지형 고도 값을 1개의 reference로 삼습니다.  
 > 자신이 속한 붉은 Grid에서 가장 가까운 붉은 Grid 3개를 나머지 referene로 삼습니다.  
-위의 기준은 그림으로 나타내보면 이해가 쉬운데, 아래의 그림에서 노란색 Grid의 지형고도를 보간하게 되는 경우에는 빨간색과 파란색 점을 reference로, 노란색 Grid의 우측에 위치한 Grid를 보간하게 되는 경우 파란색과 초록색 점을 reference로 삼게됩니다.  
+위의 기준은 그림으로 나타내보면 이해가 쉬운데, 아래의 그림에서 노란색 Grid의 지형고도를 보간하게 되는 경우에는 빨간색과 파란색 점을 reference로, 노란색 Grid의 우측에 위치한 Grid를 보간하게 되는 경우 파란색과 초록색 점을 reference로 삼게됩니다.   
 > ![보간](https://github.com/wonseokdjango/QuantizeCity/blob/master/img/Interpolation.png)  
+
 이러한 보간 과정은 소스코드의 interpolation 함수에서 확인할 수 있습니다.
 
 ### V.2. 출력파일 형식 정의
