@@ -7,16 +7,32 @@ import json
 from urllib2 import urlopen
 
 # define tunning constants
-SAMPLING_RESOLUTION = 0.000001
-NBGW = 5;
-NBGH = 5;
-NSGW = 5;
-NSGH = 5;
+SAMPLING_RESOLUTION = 0.0000001
+NBGW = 25 * 2;
+NBGH = 25 * 2;
+NSGW = 250 * 2;
+NSGH = 250 * 2;
 
 # define system paths
-QGIS_PATH = "/usr/share/qgis"
-GMAP_API_KEY = "AIzaSyB-WQIcBO85Yzd5FR7jFT_f4TNJKenRT5o"
+QGIS_PATH = "Your QGIS Installation Path"
+GMAP_API_KEY = "Your Google Map Elevation API Key"
 GMAP_API_URL = "https://maps.googleapis.com/maps/api/elevation/json?locations="
+
+def notifyError( _msg ):
+	
+	# notify error and request user input
+	# params
+	#	_msg : error message want to show
+	# returns
+	#	none. program is suspended when user input is not "y"
+
+	keyPress = input( _msg + " continue? [y/n]" )
+	if keyPress != "y":
+		exit()
+
+def interpolation( _locs ):
+
+
 
 def getBuildingHeight( _layer, _lat, _lng ):
 	
@@ -48,38 +64,24 @@ def getBuildingHeight( _layer, _lat, _lng ):
 
 	return height
 	
-def getLandElevation( _locs ):
+def getLandElevation( _lat, _lng ):
 	
 	# get land elevation of designated areas
 	# params
-	#   _locs : list of [latitude, longitude]
+	#	_lat : latitude of designated area
+	#	_lng : latitude of designated area
 	# returns
-	#   list of land elevation of desiganted areas in meter
+	#   land elevation of designated area in meter
+
+	addr = GMAP_API_URL + "%s,%s&key=%s" % ( _lat, _lng, GMAP_API_KEY )
 	
-	ret = []
+	fp = urlopen( addr )
+	response = json.loads( fp.read().decode() )
+	if response["status"] != "OK":
+		notifyError( "url open error" )
 
-	while len( _locs ) != 0:
-		PARAMS = ""
-		for idx in range( 511 ):
-			if len( _locs ) <= 1:
-				break
-			loc = _locs.pop( 0 )
-			PARAMS += "%s,%s|" % ( loc[0], loc[1] )
-
-		loc = _locs.pop( 0 )
-		PARAMS += "%s,%s&key=%s" % ( loc[0], loc[1], GMAP_API_KEY )
-	
-		fp = urlopen( GMAP_API_URL + PARAMS )
-		response = json.loads( fp.read().decode() )
-		if response["status"] != "OK":
-			keyPress = input( "url open error. continue? [y/n] : " )
-			if keyPress == "n":
-				exit()
-
-		for result in response["results"]:
-			ret.append( float( result["elevation"] ) )
-			
-	return ret
+	for result in response["results"]:
+		return float( result["elevation"] )	
 
 def generateGrid( _UL, _LR, _shpPath, _gridPath ):
 
@@ -95,45 +97,33 @@ def generateGrid( _UL, _LR, _shpPath, _gridPath ):
 	_UL = [ float( i ) for i in _UL ]
 	_LR = [ float( i ) for i in _LR ]
 	if ( _LR[1] - _UL[1] ) <= 0.0 or ( _UL[0] - _LR[0] ) <= 0.0:
-		keyPress = input( "invalid upper left, lower right. continue? [y/n] : " )
-		if keyPress == "n":
-			exit()
+		notifyError( "invalid upper left, lower right" )
 	
 	bigGrid = [ [ 0.0 ] * NBGW for row in range( NBGH ) ]
 	bg_d_x = ( _LR[1] - _UL[1] ) / float( NBGW );
 	bg_d_y = ( _UL[0] - _LR[0] ) / float( NBGH );
 
-	req = []
 	for bgRow in range( NBGH ):
 		for bgCol in range( NBGW ):
 			x = _UL[1] + ( bgCol + 0.5 ) * bg_d_x
 			y = _UL[0] - ( bgRow + 0.5 ) * bg_d_y
-			req.append( [ y, x ] )
+			bigGrid[bgRow][bgCol] = getLandElevation( y, x )
 	
-	elev = getLandElevation( req )
-	for bgRow in range( NBGH ):
-		for bgCol in range( NBGW ):
-			bigGrid[bgRow][bgCol] = elev.pop( 0 )
+	try:
+		grid = open( _gridPath, "w" )
+	except IOError, e:
+	 	notifyError( "file open error" )
 
+	header0 = "%.15lf %.15lf %.15lf %.15lf\n" % ( _UL[0], _UL[1], _LR[0], _LR[1] )
+	header1 = "%d %d %d %d\n" % ( NBGH, NBGW, NSGH, NSGW )
+	grid.write( header0 + header1 )
+
+	layer = QgsVectorLayer( _shpPath, "buildings", "ogr" )
+	if not layer.isValid():
+		notifyError( "QGIS layer loading is failed" )
+	
 	sg_d_x = ( _LR[1] - _UL[1] ) / float( NSGW * NBGW );
 	sg_d_y = ( _UL[0] - _LR[0] ) / float( NSGH * NBGH );
-
-	layer = QgsVectorLayer( _shpPath, "Buildings", "ogr" )
-	if not layer.isValid():
-		keyPress = input( "QGIS layer loading is failed. continue? [y/n] : " )
-		if keyPress == "n":
-			exit()
-	try:
-		grid = open(_gridPath, "w")
-	except IOError, e:
-	 	keyPress = input( "file open error. continue? [y/n] : " )
-	 	if keyPress == "n":
-	 		exit()
-
-	line = "%.15lf %.15lf %.15lf %.15lf\n" % (_UL[0], _UL[1], _LR[0], _LR[1])
-	grid.write(line)
-	line = "%d %d %d %d\n" % (NBGH, NBGW, NSGH, NSGW)
-	grid.write(line)
 
 	for sgRow in range( NBGH * NSGH ):
 		for sgCol in range( NBGW * NSGW ):
@@ -143,6 +133,7 @@ def generateGrid( _UL, _LR, _shpPath, _gridPath ):
 			lh = bigGrid[sgRow / NSGH][sgCol / NSGW]
 			line = "%d %d %.15f %.15f %.15f %.15f\n" % (sgRow, sgCol, y, x, bh, lh)
 			grid.write(line)
+	
 	grid.close()
 			
 if __name__ == "__main__":
