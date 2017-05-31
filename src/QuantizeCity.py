@@ -140,7 +140,7 @@ def generateGrid( _UL, _LR, _shpPath, _gridPath ):
 			x = _UL[1] + ( sgCol + 0.5 ) * sg_d_x
 			y = _UL[0] - ( sgRow + 0.5 ) * sg_d_y
 			bh = getBuildingHeight( layer, y, x )
-			lh = bigGrid[sgRow / NBGH][sgCol / NBGW]
+			lh = bigGrid[sgRow / NSGH][sgCol / NSGW]
 			line = "%d %d %.15f %.15f %.15f %.15f\n" % (sgRow, sgCol, y, x, bh, lh)
 			grid.write(line)
 	grid.close()
