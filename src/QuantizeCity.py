@@ -9,14 +9,14 @@ from urllib2 import urlopen
 
 # define tunning constants
 SAMPLING_RESOLUTION = 0.0000001
-NBGW = 25 * 2;
-NBGH = 25 * 2;
+NBGW = 20 * 2;
+NBGH = 20 * 2;
 NSGW = 250 * 2;
 NSGH = 250 * 2;
 
 # define system paths
 QGIS_PATH = "Your QGIS installation path"
-GMAP_API_KEY = "Your Google Map Elevation API Key"
+GMAP_API_KEY = "Your Google Map Elevation API key"
 GMAP_API_URL = "https://maps.googleapis.com/maps/api/elevation/json?locations="
 
 def notifyError( _msg ):
