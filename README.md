@@ -263,7 +263,7 @@ def generateGrid( _UL, _LR, _shpPath, _gridPath ):
 
 서울시에 대해 (NBGH, NBGW, NSGH, NSGW) = (40, 40, 500, 500)정도로 위에서 작성한 프로그램을 수행하면 대략 30GB 정도되는 텍스트파일이 만들어집니다. 이는 in-memory로 처리하기에는 매우 빡세보입니다. 따라서, DB를 구성하도록 합니다. 서버에 DB설치, python 연동을 위한 package 받기 등은 아래의 링크에 매우 친절히 설명되어 있습니다.
 
-> ![MariaDB-python 연동](https://mariadb.com/resources/blog/how-connect-python-programs-mariadb)
+> [MariaDB-python 연동](https://mariadb.com/resources/blog/how-connect-python-programs-mariadb)
 
 아래 그림은 schema라고 부르기도 창피할 정도로 간단한 GridMap schema입니다. 아래 스키마를 그대로 서버에 업로드 합니다.
 
