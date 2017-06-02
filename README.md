@@ -4,7 +4,7 @@ Quantizing city as **grid** and adding **height attribute(land elevation + build
 
 > **author** : won.seok.django@gmail.com
 
-> **last update** : 20170601
+> **last update** : 20170602
 
 ## I. 문서의 목적
 
@@ -27,6 +27,8 @@ Quantizing city as **grid** and adding **height attribute(land elevation + build
 > * 구해진 raw data를 DB에 업로드하고 조작하기
 
 > * 구성한 DB에 날린 쿼리와 실측값을 통해 검증하기
+
+> * 한계
 
 ## II. 준비할 사항
 
@@ -277,19 +279,19 @@ __author__ = "Wonseok Lee"
 
 import pymysql
 
-MAXCHUNK = 100000
+MAXCHUNK = 100000	# tune this constant
 
 if __name__ == "__main__":
 
 	# main starts here !!!
 
 	con = pymysql.connect(
-			host       = "localhost"   ,
-			port       = 3306          ,
-			user       = "root"		   ,
-			passwd     = "Your Passwd" ,
-			db         = "Your DB"     ,
-			charset    = "utf8" )
+			host    = "localhost"    ,
+			port    = 3306           ,
+			user    = "Your DB user" ,
+			passwd  = "Your DB pswd" ,
+			db      = "Your DB name" ,
+			charset = "utf8" )
 	
 	cursor = con.cursor()
 	query = """	insert into 
@@ -325,10 +327,104 @@ if __name__ == "__main__":
 
 ### Appendix.2. 검증
 
-열심히 database에 구한 grid를 업로드 했으니 이제 DB에 select 쿼리를 요청하는 client 코드를 만들어보고 옳은 값을 반환하는지 확인해 봅니다. 사용자가 위도와 경도를 입력했을 때, 해당 grid의 높이 정보를 반환하는 client 코드는 아래와 같습니다.
+열심히 database에 구한 grid를 업로드 했으니 이제 DB에 select 쿼리를 요청하는 client 코드를 만들어보고 옳은 값을 반환하는지 확인해 봅니다. 사용자가 위도와 경도를 입력했을 때, 해당 grid의 높이 정보를 반환하는 client 코드는 아래와 같습니다. 아래는 예제코드로 UL, LR, 그리드 갯수 등을 파일에서 얻어오고 있지만, 추후에 meta table을 사용하여 해당 정보를 얻어올 수도 있습니다.
 
 ```python
 
+#-*- coding: utf-8 -*-
 
+__author__ = "Wonseok Lee"
+
+import math
+import pymysql
+
+def getMeta( _gridPath ):
+
+	grid = open( _gridPath, "r" )
+	ul_lat, ul_lng, lr_lat, lr_lng = grid.readline().split()
+	nbgh, nbgw, nsgh, nsgw = grid.readline().split()
+	grid.close()
+
+	ul_lat = float( ul_lat )
+	ul_lng = float( ul_lng )
+	lr_lat = float( lr_lat )
+	lr_lng = float( lr_lng )
+	nbgh = float( nbgh )
+	nbgw = float( nbgw )
+	nsgh = float( nsgh )
+	nsgw = float( nsgw )
+
+	d_lat = ( ul_lat - lr_lat ) / ( nbgh * nsgh )
+	d_lng = ( lr_lng - ul_lng ) / ( nbgw * nsgw )
+
+	return [ [ ul_lat, ul_lng ], [ lr_lat, lr_lng ], [ d_lat, d_lng ] ]
+
+def getRecord( _cur, _ul, _lr, _delta, _lat, _lng ):
+
+	# get Record at _lat, _lng from DB
+	# params
+	#	_cur   : current cursor of _con
+	#	_ul    : upper left latitude, longitude
+	#	_lr    : lower right latitude, longitude
+	#	_delta : delta latitude, logitude between two adjacent grid
+	#	_lat   : latitude of designated area
+	#	_lng   : longitude of designated area
+	# returns
+	#	none. print selected record
+
+	query = "select * from Seoul_40x40_500x500 where ROW = %s and COL = %s"
+	
+	row = int( ( _ul[0] - _lat ) / _delta[0] )
+	col = int( ( _lng - _ul[1] ) / _delta[1] )
+
+	_cur.execute( query, ( row, col ) )
+	result = _cur.fetchall()
+
+	print( result )
+
+if __name__ == "__main__":
+
+	# main starts here !!!
+
+	con = pymysql.connect(
+			host    = "Your DB host" ,
+			port    = 3306           ,
+			user    = "Your DB user" ,
+			passwd  = "Your DB pswd" ,
+			db      = "Your DB name" ,
+			charset = "utf8" )
+	
+	cursor = con.cursor()
+	
+	gridPath = raw_input( "insert grid file path : " )
+
+	ul, lr, delta = getMeta( gridPath )
+
+	while True:
+		lat = float( input( "lat : " ) )
+		lng = float( input( "lng : " ) )
+		if lat == -1.0 or lng == -1.0:
+			break;
+		getRecord( cursor, ul, lr, delta, lat, lng )
+
+	cursor.close()
 
 ```
+
+> ![검증입력](https://github.com/wonseokdjango/QuantizeCity/blob/master/img/v_ref.png)
+
+위의 서울시 3D 지도를 보면 봉천초등학교 (37.480837, 126.960076) 지역에는 17.4m 짜리의 건물이 64.7m의 지형 위에 세워져있습니다.
+
+> ![검증출력](https://github.com/wonseokdjango/QuantizeCity/blob/master/img/v_chk.png)
+
+해당 좌표를 Client.py를 사용해서 조회해보니 위와 같이 결과를 얻을 수 있습니다. 비교적 적은 오차로 정보가 얻어진 것을 알 수 있습니다.
+
+
+### Appendix.3. 한계점
+
+이 문서에서 밝힌 grid map 데이터 구성은 아래와 같은 한계점을 갖습니다.
+
+> - 지형 고도를 얻기 위한 grid가 40x40으로 interpolation을 해도 무시할 수 없을 정도의 지형고도 오차가 존재합니다.
+
+> - 건물 하나는 모양과 상관 없이 단 하나의 건물 높이 정보를 갖습니다.
+
